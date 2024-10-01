@@ -89,7 +89,7 @@ function create3DModel(image, txt_image) {
 
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
     const depthValue = Math.max(Math.min(data[i] / 255.5, 0.95), 1./255); // Normalize depth from 0 to 1 based on red channel
-    var z = 0.1 * maxdim / (1. - (Math.pow(3.*depthValue + 1., 0.5) - 1.));
+    var z = 0.1 * maxdim / (1. - (Math.pow(8.*depthValue + 1., 0.5) - 1.)/2.0);
     vertices[j + 2] = - z + 120; // Scale depth to 0.2 units
     vertices[j + 0] = vertices[j + 0] * z / maxdim;
     vertices[j + 1] = vertices[j + 1] * z / maxdim - 1.;
