@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Model from Image & Depth Map</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+    #upload { position: fixed; top: 10px; left: 10px; }
+  </style>
+    <script type="importmap">
+        {
+            "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+            }
+        }
+        </script>
+</head>
+<body>
+
+<div id="upload">
+  <input type="file" id="textureInput" accept="image/*" /><br/>
+  <input type="file" id="depthMapInput" accept="image/*" />
+</div>
+
+<canvas id="canvas" style="display:none"></canvas>
+<script type="module">
+    import * as THREE from 'three';
+    let scene, camera, renderer, mesh;
+
+    // Initialize the 3D scene
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 3;
+
+      renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const light = new THREE.DirectionalLight(0xffffff, 1.0);
+      light.position.set(0, 1, 1).normalize();
+      scene.add(light);
+
+      animate();
+    }
+
+    let n = 0;
+    // Handle animation and rendering
+    function animate() {
+      requestAnimationFrame(animate);
+      if (mesh) {
+        mesh.rotation.y = 0.2 * Math.sin(n * 0.0171); // Rotate the model
+        mesh.rotation.x = 0.3 * Math.cos(n * 0.0139); // Rotate the model
+        n += 1;
+      }
+      renderer.render(scene, camera);
+    }
+
+// Create a 3D geometry from the depth map
+function create3DModel(image, txt_image) {
+
+  const texture = new THREE.TextureLoader().load(URL.createObjectURL(txt_image));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const canvas = document.getElementById('canvas');
+  const context = canvas.getContext('2d');
+
+  const width = image.width;
+  const height = image.height;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // Draw the depth map onto the canvas
+  context.drawImage(image, 0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  // Create a plane geometry to represent the mesh
+  const geometry = new THREE.PlaneGeometry(width, height, width - 1, height - 1); // Create grid
+  var filteredVertices = [];
+
+  // Adjust z-coordinate (depth) based on the image data
+  const vertices = geometry.attributes.position.array;
+
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    const depthValue = Math.min(data[i] / 255.5, 0.95); // Normalize depth from 0 to 1 based on red channel
+    vertices[j + 2] = -0.8 / (1. - depthValue) + 0.7; // Scale depth to 0.2 units
+    vertices[j + 0] *= 1. / (1. - depthValue);
+    vertices[j + 1] *= 1. / (1. - depthValue);
+    if (i > 0 && Math.abs(data[i] - data[i - 1]) < 50) {
+      filteredVertices.push(vertices[j], vertices[j + 1], vertices[j + 2]);
+    }
+
+  }
+
+  // Update the new geometry with the filtered vertices
+  // geometry.setAttribute('position', new THREE.Float32BufferAttribute(filteredVertices, 3));
+  geometry.attributes.position.needsUpdate = true;
+
+  // Now you can create a new mesh with the filtered geometry
+  const material = new THREE.MeshBasicMaterial({ map: texture });
+  // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  mesh = new THREE.Mesh(geometry, material);
+  mesh.scale.x = 30. / height;
+  mesh.scale.y = 30. / height;
+  mesh.scale.z = 24.0;
+  scene.add(mesh);
+  camera.position.z = 11;
+  animate();
+}
+
+
+// Event listeners for image uploads
+document.getElementById('textureInput').addEventListener('change', function (event) {
+  const textureImage = event.target.files[0];
+  document.getElementById('depthMapInput').addEventListener('change', function (event) {
+    const file = event.target.files[0];
+  if (file) {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = function () {
+      create3DModel(img, textureImage);
+    };
+  }
+  });
+});
+init();
+</script>
+</body>
+</html>
